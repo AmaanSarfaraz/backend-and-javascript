@@ -75,4 +75,16 @@ const registerUser = asyncHandler( async (req, res, next) => {
 
 })
 
-export { registerUser }
+const loginUser = asyncHandler(async (req, res) => {
+    // req body  = data
+    // username or email bsed accesss
+    //  find the user 
+    // password check
+    // access and refdresh token
+    //  send cookies
+
+    
+
+})
+  
+export { registerUser, loginUser }
