@@ -4,7 +4,6 @@ import {User} from "../models/user.models.js"
 import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
 import jwt  from "jsonwebtoken"
-import { response } from "express"
 import mongoose from "mongoose"
 
 const generateAccessAndRefreshToken = async (userId) => {
@@ -147,8 +146,8 @@ const logoutUser = asyncHandler( async (req, res) => {
     await User.findByIdAndUpdate(
         req.user._id,
         {
-            $set: {
-                refreshToken: undefined,
+            $unset: {
+                refreshToken: 1, //this removes the field from document
             }
         },
         {
@@ -197,7 +196,7 @@ const refreshAccessToken = asyncHandler( async (req, res) => {
         return res
         .status(200)
         .cookie("accessToken", accessToken, options)
-        .cookie("refreshToken", refreshToken, options)
+        .cookie("refreshToken", newRefreshToken, options)
         .json(
             new ApiResponse(200, {accessToken, newRefreshToken}, "Access  token refreshed")
         )
@@ -207,21 +206,24 @@ const refreshAccessToken = asyncHandler( async (req, res) => {
 })
 const changeCurrentPassword = asyncHandler( async (req, res) => {
     const {oldPassword, newPassword} = req.body
-    const user = User.findById(req.user?._id)
+    const user = await User.findById(req.user?._id)
+
+    if (!user) {
+        throw new ApiError(404, "user not found")
+    }
     const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
 
     if (!isPasswordCorrect) {
         throw new ApiError(400, "Invalid old password")
-
-        user.password = newPassword
-        await user.save({validateBeforeSave: false})
-
-        return res
-        .status(200)
-        .json(
-            new ApiResponse(200, {}, "Password updated successfully")
-        )
     }
+    user.password = newPassword
+    await user.save({validateBeforeSave: false})
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, {}, "Password updated successfully")
+    )
 
 })
 
@@ -348,7 +350,7 @@ const getUserChannelProfile  = asyncHandler(async(req, res) => {
                     $size: "$subscribedTo"
                 },
                 isSubscribed: {
-                    $condition: {
+                    $cond: {
                         if: {$in: [req.user?._id, "$subscribers.subscriber"]},
                         then: true,
                         else: false
@@ -383,7 +385,7 @@ const getWatchHistory = asyncHandler(async(req, res) => {
     const user = await User.aggregate([
         {
             $match: {
-                _id: new mongoose.Types.toObjectId(req.user?._id)
+                _id: new mongoose.Types.ObjectId(req.user?._id)
             }
         },
         {
